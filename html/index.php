@@ -1,5 +1,5 @@
 <?php
-require_once("meekrodb.2.3.class.php");
+require_once("../vendor/autoload.php");
 require_once('../configuration.php');
 require_once('statistics.php');
 
