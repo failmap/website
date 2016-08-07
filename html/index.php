@@ -1,7 +1,12 @@
 <?php
-require_once("meekrodb.2.3.class.php");
+
+// todo on production: change Sudwest Fryslan:
+// UPDATE `coordinate` SET `organization` = 'Sudwest Fryslan' WHERE `coordinate`.`id` = 27;
+// UPDATE `organization` SET `name` = 'Nuenen, Gerwen en Nederwetten' WHERE `organization`.`name` = 'Nuenen';
+
+include_once("meekrodb.2.3.class.php");
 require_once('../configuration.php');
-require_once('statistics.php');
+include_once('statistics.php');
 
 // some helper-functions that should be put in classes...
 // no exception on rounding, so if total is unknown or 0, just return 0.
@@ -12,7 +17,7 @@ function percentage($number, $total){
 
 $ratingColors = array("0" => "000000", "F" => "ff0000", "T" => "ff0000", "D" => "ff0000",  "C" => "FFA500",  "B" => "FFA500", "A-" => "00ff00", "A" => "00ff00","A+" => "00ff00","A++" => "00ff00");
 function getRatingColor($rating){
-    global $ratingColors; // saves re-initializing the same list. But this should be a class thing. Global is just a sign for disgusting code.
+    global $ratingColors; // saves re-initializing the same list. But this should be a class thing.
     if (isset($ratingColors[$rating])){
         return $ratingColors[$rating];
     } else {
@@ -191,7 +196,11 @@ function makeHTMLId($text){
          <p>Faalkaart geeft inzicht in hoe veilig uw gemeente is richting het internet. Er wordt gekeken hoe veilig de gemeente haar verbindingen heeft ingericht. Het is belangrijk dat dit goed 
 gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
             <p>Stuur nieuwe subdomeinen in via twitter: <a href="https://twitter.com/faalkaart">@faalkaart</a> of mail <a href="mailto:info@faalkaart.nl?subject=subdomeinen">info@faalkaart.nl</a></p>
-         <p><small>Update 8 april 2016: Het aantal domeinen met een onvoldoende is gezakt naar 2%, was ooit 8%. Er zijn zojuist 1200 domeinen toegevoegd. Er is een team aan het ontstaan dat de faalkaart verder gaat uitbreiden en onderhouden. Vele handen maken licht werk. Dank aan gemeenten voor het insturen van subdomeinen. Dit is altijd welkom!</small></p>
+         <p><small>Update 7 augustus 2016: Faalkaart heeft de steun gekregen van het SIDN fonds, we zullen het komende jaar de kaart uitbreiden en op veel meer controleren. We gaan de kaartrot oplossen en zorgen dat het makkelijk wordt om zelf de kaart te kunnen draaien (onafhankelijk). Ook is de chaching van de site ingevoerd, dus het voelt weer snel(ler) aan.</small></p>
+         <!-- <p><small>Update 9 juni 2016: Door een nieuwe kwetsbaarheid zijn er 100+ domeinen in het rood beland, van 2% naar 9% kwetsbaar dus. Het aantal matige domeinen blijft gelukkig afnemen. Hoe lang zal het duren tot alles gepatched is? Wie patcht het laatst?</small></p> -->
+         <!-- <p><small>Extra update: Faalkaart heeft een projectbijdrage gevraagd aan het SIDN fonds om er voor te zorgen dat dit middel breder en makkelijker kan worden ingezet. We gaan hierdoor vele honderdduizenden kwetsbaarheden aan de kaak te stellen en blijven motiveren om ze te verhelpen. De techneuten, hackers en nerds achter faalkaart staan te trappelen om het internet robuuster te maken. Half Juni weten we meer. Spannend!</small></p> -->
+         <!-- <p><small>Extra update 2: We zien dat door de grote hoeveelheid data we caching moeten gaan toepassen en verder moeten optimaliseren. De bedoeling is om de kaart zo actueel mogelijk weer te geven. Tot dit opgelost is zal het iets langer duren voordat de kaart geladen is.</small></p>-->
+         <!-- <p><small>Update 8 april 2016: Het aantal domeinen met een onvoldoende is gezakt naar 2%, was ooit 8%. Er zijn zojuist 1200 domeinen toegevoegd. Er is een team aan het ontstaan dat de faalkaart verder gaat uitbreiden en onderhouden. Vele handen maken licht werk. Dank aan gemeenten voor het insturen van subdomeinen. Dit is altijd welkom!</small></p> -->
          <!-- <p><small>Update 25 maart 2016: De kaart wordt automatisch ververst. Onder de uitleg staat een overzicht met domeinen die onvoldoende scoren.</small></p>-->
          <!-- <p><small>Update 18 maart 2016: De kaart wordt zeer binnenkort automatisch bijgewerkt. Nieuw zijn statistieken met historie. De domeinenlijst is verbeterd en er is tekst toegevoegd over de totstandkoming van het cijfer. Binnenkort ook open source.</small></p>
          <!-- <p><small>Update 16 maart 2016: De eerste serie van 1800 domeinen is geladen, dit wordt nog aangevuld en zal binnenkort opnieuw worden gecontroleerd. De testdatum is nu zichtbaar. De eerste verbeteringen schijnen een half uur na presentatie al te zijn doorgevoerd. Dat is stoer!</small></p>-->
@@ -206,8 +215,10 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
             <img class="map" name="NLGem" alt="NLGem" align="absmiddle" hspace="0" vspace="0" src="./images/kaart2.png" width="770" usemap="#NLGem" border="0">
         <map name="NLGem" id="NLGem">
         <?php
+            // todo: this has no time-constraint yet.
+            // none-time constrained: results overwrite eachother $sql = "select coordinate.organization, area, max(rating) as rating, max(ratingNoTrust) as oordeelInternVertrouwen from coordinate left outer join organization ON coordinate.organization = organization.name left outer JOIN url ON url.organization = organization.name left outer JOIN scans_ssllabs ON scans_ssllabs.url = url.url GROUP BY area";
             // some municipalities have more than one area... you have to draw all of them and still have the right color :) FUN!
-            // grouping by area, because no area is unique... this feels like a disgusting hack.
+            // grouping by area is a bit of a disgusting hack, because no area is unique...
             $sql = "SELECT 
                           url.organization as organization, 
                           area,
@@ -229,6 +240,7 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                           AND scans_ssllabs.isDead = 0
                         group by (area) 
                         order by url.organization ASC, rating DESC";
+            //$sql = "select coordinate.organization, area, max(rating) as rating, max(ratingNoTrust) as oordeelInternVertrouwen from coordinate left outer join organization ON coordinate.organization = organization.name left outer JOIN url ON url.organization = organization.name left outer JOIN scans_ssllabs ON scans_ssllabs.url = url.url GROUP BY area";
             $results = DB::query($sql);
             foreach ($results as $row) {
                 $colorOordeel = getRatingColor($row['rating']);
@@ -259,7 +271,7 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
             $progressOrange = floor(($orange/$total)*100);
             $progressGreen = floor(($green/$total)*100);
 
-            // due to rounding we might miss a little... so fill it up on the positive side... we are so generous.
+            // due to rounding we might miss a little... so fill it up on the positive side...
             if ($progressRed+$progressOrange+$progressGreen<100) $progressGreen += 100 - ($progressRed+$progressOrange+$progressGreen);
         ?>
 
@@ -373,7 +385,7 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
             $gradeColors = array("0" => "000000", "F" => "ff0000", "T" => "ff0000", "D" => "ff0000",  "C" => "FFA500",  "B" => "FFA500", "A-" => "00ff00", "A" => "00ff00","A+" => "00ff00","A++" => "00ff00");
 
                 $previousGemeente = ""; $previousUrl = "";
-                $i=0; // should use a template engine :) which avoids setting these types of zany variables and status tracking.
+                $i=0; // should use a template engine :)
 
                 /**
 
@@ -384,12 +396,18 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                  Vendor neutral and fast solution:
                  http://stackoverflow.com/questions/121387/fetch-the-row-which-has-the-max-value-for-a-column
                  
-                 With this one we browse through time and get only one result per url :) Time is by default NOW()
+                 SELECT organization, url.url as theurl, scans_ssllabs.ipadres, scans_ssllabs.servernaam, scans_ssllabs.scandate, scans_ssllabs.scantime, scans_ssllabs.rating as oordeel FROM `url` left outer join scans_ssllabs ON url.url = scans_ssllabs.url LEFT OUTER JOIN scans_ssllabs as t2 ON (scans_ssllabs.url = t2.url AND t2.scandate > scans_ssllabs.scandate  AND t2.scandate < '2016-03-19') WHERE t2.url IS NULL AND organization <> '' AND scans_ssllabs.scandate < '2016-03-19' order by organization ASC
                  
-                 The queries selects the last scanned domain, which can have multiple endoints (N). 
-                 In "the latest set" there is uniqueness on (url, ip, port). Group-concating or maxing those for the worst rating determines the color.
+                 // with this one we browse through time and get only one result per url :) Time is by default NOW()
                  
                  */
+
+                // This selects the LAST SCANNED domain, but these can be multiple since a domain can have N endpoints.
+                // this means that coloring is off, since the N-1 endpoint might have F and endpoint N may have A.
+                // that means the domain will be falsely colored as A.
+
+                // the solution was to add uniciteit (uniqueness) to the set of url, ip and port, and group-concating or maxing those
+                // for the worst color the domain has.
                 
                 $sql = "SELECT 
                           organization, 
@@ -418,7 +436,7 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                     foreach ($results as $row) {
 
                         if ($previousGemeente != $row['organization']){
-                            // close the previous row.
+                            // vorige afsluiten
                             if ($i!= 0) {
                                 print "</td></tr>";
                             }
@@ -426,6 +444,7 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                             print "<tr><td><a name=\"".$row['organization']."\"></a>".$row['organization']."</td><td>";
                         }
 
+                        // todo: count number of urls and endpoints.
                         if ($previousUrl != $row['theurl']){
                             if (isset($gradeColors[$row['rating']])){
                                 $colorOordeel = $gradeColors[$row['rating']];
@@ -433,7 +452,7 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                                 $colorOordeel = "AAAAAA";
                             }
 
-                            // show a nice (2x) if there are multiple endpoints. Amsterdam has redundant endpoints on both ipv4 and ipv6.
+                            // show a nice (2x) if there are multiple endpoints. Amsterdam has redundant endpoints on both ipv4 and ipv6
                             if ($row['endpointsfound'] > 1) {
                                 print "<div style='color: #" . $colorOordeel . "' id='" . makeHTMLId($row['theurl']) . "'>" . $row['theurl'] . " (" . $row['endpointsfound'] . "x)</div> ";
                             } else {
@@ -491,7 +510,6 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                 <li>JQuery MapHighlight door David Lynch</li>
             </ul>
 
-            // todo: be warned, below is only a copy of the above table, with only the F-grades showing. So this is where functional decomposition should have started.
             <div class="page-header">
                 <a name="takenlijst"></a>
                 <h2>Wat scoort onvoldoende?</h2>
@@ -505,8 +523,29 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                 $gradeColors = array("0" => "000000", "F" => "ff0000", "T" => "ff0000", "D" => "ff0000",  "C" => "FFA500",  "B" => "FFA500", "A-" => "00ff00", "A" => "00ff00","A+" => "00ff00","A++" => "00ff00");
 
                 $previousGemeente = ""; $previousUrl = "";
-                $i=0;
+                $i=0; // should use a template engine :)
 
+                /**
+
+                We want a query that:
+                - Gives results to a certain date.
+                - Gives only the latest result from the entire set.
+
+                Vendor neutral and fast solution:
+                http://stackoverflow.com/questions/121387/fetch-the-row-which-has-the-max-value-for-a-column
+
+                SELECT organization, url.url as theurl, scans_ssllabs.ipadres, scans_ssllabs.servernaam, scans_ssllabs.scandate, scans_ssllabs.scantime, scans_ssllabs.rating as oordeel FROM `url` left outer join scans_ssllabs ON url.url = scans_ssllabs.url LEFT OUTER JOIN scans_ssllabs as t2 ON (scans_ssllabs.url = t2.url AND t2.scandate > scans_ssllabs.scandate  AND t2.scandate < '2016-03-19') WHERE t2.url IS NULL AND organization <> '' AND scans_ssllabs.scandate < '2016-03-19' order by organization ASC
+
+                // with this one we browse through time and get only one result per url :) Time is by default NOW()
+
+                 */
+
+                // This selects the LAST SCANNED domain, but these can be multiple since a domain can have N endpoints.
+                // this means that coloring is off, since the N-1 endpoint might have F and endpoint N may have A.
+                // that means the domain will be falsely colored as A.
+
+                // the solution was to add uniciteit (uniqueness) to the set of url, ip and port, and group-concating or maxing those
+                // for the worst color the domain has.
 
                 $sql = "SELECT 
                           organization, 
@@ -537,7 +576,7 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                 foreach ($results as $row) {
 
                     if ($previousGemeente != $row['organization']){
-
+                        // vorige afsluiten
                         if ($i!= 0) {
                             print "</td></tr>";
                         }
@@ -545,6 +584,7 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                         print "<tr><td><a name=\"".$row['organization']."\"></a>".$row['organization']."</td><td>";
                     }
 
+                    // todo: count number of urls and endpoints.
                     if ($previousUrl != $row['theurl']){
                         if (isset($gradeColors[$row['rating']])){
                             $colorOordeel = $gradeColors[$row['rating']];
@@ -552,6 +592,7 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                             $colorOordeel = "AAAAAA";
                         }
 
+                        // show a nice (2x) if there are multiple endpoints. Amsterdam has redundant endpoints on both ipv4 and ipv6
                         if ($row['endpointsfound'] > 1) {
                             print "<div style='color: #" . $colorOordeel . "' id='" . makeHTMLId($row['theurl']) . "'>" . $row['theurl'] . " (" . $row['endpointsfound'] . "x)</div><small>".$row['scanmoment']."</small>";
                         } else {
