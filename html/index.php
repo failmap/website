@@ -613,3 +613,6 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
     </div>
 </body>
 </html>
+<!--
+This page was generated with MSPAINT.EXE on <?php echo date(DATE_RFC2822); ?>
+-->
