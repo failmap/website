@@ -614,5 +614,5 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
 </body>
 </html>
 <!--
-This page was generated with MSPAINT.EXE on <?php echo date(DATE_RFC2822); ?> in <?php round((microtime(TRUE)-$_SERVER['REQUEST_TIME_FLOAT']), 4); ?> ms
+This page was generated with MSPAINT.EXE on <?php echo date(DATE_RFC2822); ?> in <?php echo round((microtime(TRUE)-$_SERVER['REQUEST_TIME_FLOAT']), 4); ?> ms
 -->
