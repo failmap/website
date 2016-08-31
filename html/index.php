@@ -93,25 +93,25 @@ function makeHTMLId($text){
             $previousUrl = ""; $i=0;
 
             // ssllabs can discover multiple endpoints per domain. There can be multiple IP-address on both IPv4 and IPv6.
-            $sql = "SELECT 
-                          organization, 
-                          url.url as theurl, 
-                          scans_ssllabs.ipadres, 
+            $sql = "SELECT
+                          organization,
+                          url.url as theurl,
+                          scans_ssllabs.ipadres,
                           scans_ssllabs.servernaam,
                           scans_ssllabs.poort,
-                          scans_ssllabs.scandate, 
-                          scans_ssllabs.scantime, 
-                          scans_ssllabs.rating 
-                        FROM `url` left outer join scans_ssllabs ON url.url = scans_ssllabs.url 
+                          scans_ssllabs.scandate,
+                          scans_ssllabs.scantime,
+                          scans_ssllabs.rating
+                        FROM `url` left outer join scans_ssllabs ON url.url = scans_ssllabs.url
                         LEFT OUTER JOIN scans_ssllabs as t2 ON (
                           scans_ssllabs.url = t2.url
                           AND scans_ssllabs.ipadres = t2.ipadres
                           AND scans_ssllabs.poort = t2.poort
-                          AND t2.scanmoment > scans_ssllabs.scanmoment  
-                          AND t2.scanmoment <= NOW()) 
-                        WHERE t2.url IS NULL 
-                          AND organization <> '' 
-                          AND scans_ssllabs.scanmoment <= now() 
+                          AND t2.scanmoment > scans_ssllabs.scanmoment
+                          AND t2.scanmoment <= NOW())
+                        WHERE t2.url IS NULL
+                          AND organization <> ''
+                          AND scans_ssllabs.scanmoment <= now()
                           AND url.isDead = 0
                           AND scans_ssllabs.isDead = 0
                         order by organization ASC";
@@ -193,7 +193,7 @@ function makeHTMLId($text){
 
         <div class="jumbotron">
             <h1>Faalkaart</h1>
-         <p>Faalkaart geeft inzicht in hoe veilig uw gemeente is richting het internet. Er wordt gekeken hoe veilig de gemeente haar verbindingen heeft ingericht. Het is belangrijk dat dit goed 
+         <p>Faalkaart geeft inzicht in hoe veilig uw gemeente is richting het internet. Er wordt gekeken hoe veilig de gemeente haar verbindingen heeft ingericht. Het is belangrijk dat dit goed
 gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
             <p>Stuur nieuwe subdomeinen in via twitter: <a href="https://twitter.com/faalkaart">@faalkaart</a> of mail <a href="mailto:info@faalkaart.nl?subject=subdomeinen">info@faalkaart.nl</a></p>
          <p><small>Update 7 augustus 2016: Faalkaart heeft de steun gekregen van het SIDN fonds, we zullen het komende jaar de kaart uitbreiden en op veel meer controleren. We gaan de kaartrot oplossen en zorgen dat het makkelijk wordt om zelf de kaart te kunnen draaien (onafhankelijk). Ook is de chaching van de site ingevoerd, dus het voelt weer snel(ler) aan.</small></p>
@@ -219,11 +219,11 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
             // none-time constrained: results overwrite eachother $sql = "select coordinate.organization, area, max(rating) as rating, max(ratingNoTrust) as oordeelInternVertrouwen from coordinate left outer join organization ON coordinate.organization = organization.name left outer JOIN url ON url.organization = organization.name left outer JOIN scans_ssllabs ON scans_ssllabs.url = url.url GROUP BY area";
             // some municipalities have more than one area... you have to draw all of them and still have the right color :) FUN!
             // grouping by area is a bit of a disgusting hack, because no area is unique...
-            $sql = "SELECT 
-                          url.organization as organization, 
+            $sql = "SELECT
+                          url.organization as organization,
                           area,
                           max(scans_ssllabs.rating) as rating
-                        FROM `url` 
+                        FROM `url`
                         left outer join scans_ssllabs ON url.url = scans_ssllabs.url
                         left outer join organization ON url.organization = organization.name
                         inner join coordinate ON coordinate.organization = organization.name
@@ -231,14 +231,14 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                           scans_ssllabs.url = t2.url
                           AND scans_ssllabs.ipadres = t2.ipadres
                           AND scans_ssllabs.poort = t2.poort
-                          AND t2.scanmoment > scans_ssllabs.scanmoment  
-                          AND t2.scanmoment <= DATE_ADD(now(), INTERVAL -0 DAY)) 
-                        WHERE t2.url IS NULL 
-                          AND url.organization <> '' 
-                          AND scans_ssllabs.scanmoment <= DATE_ADD(now(), INTERVAL -0 DAY) 
+                          AND t2.scanmoment > scans_ssllabs.scanmoment
+                          AND t2.scanmoment <= DATE_ADD(now(), INTERVAL -0 DAY))
+                        WHERE t2.url IS NULL
+                          AND url.organization <> ''
+                          AND scans_ssllabs.scanmoment <= DATE_ADD(now(), INTERVAL -0 DAY)
                           AND url.isDead = 0
                           AND scans_ssllabs.isDead = 0
-                        group by (area) 
+                        group by (area)
                         order by url.organization ASC, rating DESC";
             //$sql = "select coordinate.organization, area, max(rating) as rating, max(ratingNoTrust) as oordeelInternVertrouwen from coordinate left outer join organization ON coordinate.organization = organization.name left outer JOIN url ON url.organization = organization.name left outer JOIN scans_ssllabs ON scans_ssllabs.url = url.url GROUP BY area";
             $results = DB::query($sql);
@@ -296,7 +296,7 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
         $previousQuarter = $Stats->goBack(91,'municipality');
         $previousHalfYear = $Stats->goBack(182,'municipality');
 
-	
+
 
 ?>
         <div class="page-header">
@@ -395,11 +395,11 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
 
                  Vendor neutral and fast solution:
                  http://stackoverflow.com/questions/121387/fetch-the-row-which-has-the-max-value-for-a-column
-                 
+
                  SELECT organization, url.url as theurl, scans_ssllabs.ipadres, scans_ssllabs.servernaam, scans_ssllabs.scandate, scans_ssllabs.scantime, scans_ssllabs.rating as oordeel FROM `url` left outer join scans_ssllabs ON url.url = scans_ssllabs.url LEFT OUTER JOIN scans_ssllabs as t2 ON (scans_ssllabs.url = t2.url AND t2.scandate > scans_ssllabs.scandate  AND t2.scandate < '2016-03-19') WHERE t2.url IS NULL AND organization <> '' AND scans_ssllabs.scandate < '2016-03-19' order by organization ASC
-                 
+
                  // with this one we browse through time and get only one result per url :) Time is by default NOW()
-                 
+
                  */
 
                 // This selects the LAST SCANNED domain, but these can be multiple since a domain can have N endpoints.
@@ -408,29 +408,29 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
 
                 // the solution was to add uniciteit (uniqueness) to the set of url, ip and port, and group-concating or maxing those
                 // for the worst color the domain has.
-                
-                $sql = "SELECT 
-                          organization, 
-                          url.url as theurl, 
-                          scans_ssllabs.ipadres, 
-                          scans_ssllabs.servernaam, 
-                          scans_ssllabs.scandate, 
-                          scans_ssllabs.scantime, 
+
+                $sql = "SELECT
+                          organization,
+                          url.url as theurl,
+                          scans_ssllabs.ipadres,
+                          scans_ssllabs.servernaam,
+                          scans_ssllabs.scandate,
+                          scans_ssllabs.scantime,
                           count(scans_ssllabs.rating) as endpointsfound,
                           max(scans_ssllabs.rating) as rating
-                        FROM `url` left outer join scans_ssllabs ON url.url = scans_ssllabs.url 
+                        FROM `url` left outer join scans_ssllabs ON url.url = scans_ssllabs.url
                         LEFT OUTER JOIN scans_ssllabs as t2 ON (
                           scans_ssllabs.url = t2.url
                           AND scans_ssllabs.ipadres = t2.ipadres
                           AND scans_ssllabs.poort = t2.poort
-                          AND t2.scanmoment > scans_ssllabs.scanmoment  
-                          AND t2.scanmoment <= now()) 
-                        WHERE t2.url IS NULL 
-                          AND organization <> '' 
-                          AND scans_ssllabs.scanmoment <= now() 
+                          AND t2.scanmoment > scans_ssllabs.scanmoment
+                          AND t2.scanmoment <= now())
+                        WHERE t2.url IS NULL
+                          AND organization <> ''
+                          AND scans_ssllabs.scanmoment <= now()
                           AND url.isDead = 0
                           AND scans_ssllabs.isDead = 0
-                        group by (scans_ssllabs.url) 
+                        group by (scans_ssllabs.url)
                         order by organization ASC, rating DESC";
                 $results = DB::query($sql);
                     foreach ($results as $row) {
@@ -547,30 +547,30 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                 // the solution was to add uniciteit (uniqueness) to the set of url, ip and port, and group-concating or maxing those
                 // for the worst color the domain has.
 
-                $sql = "SELECT 
-                          organization, 
-                          url.url as theurl, 
-                          scans_ssllabs.ipadres, 
-                          scans_ssllabs.servernaam, 
-                          scans_ssllabs.scandate, 
-                          scans_ssllabs.scantime, 
+                $sql = "SELECT
+                          organization,
+                          url.url as theurl,
+                          scans_ssllabs.ipadres,
+                          scans_ssllabs.servernaam,
+                          scans_ssllabs.scandate,
+                          scans_ssllabs.scantime,
                           min(scans_ssllabs.scanmoment) as scanmoment,
                           count(scans_ssllabs.rating) as endpointsfound,
                           max(scans_ssllabs.rating) as rating
-                        FROM `url` left outer join scans_ssllabs ON url.url = scans_ssllabs.url 
+                        FROM `url` left outer join scans_ssllabs ON url.url = scans_ssllabs.url
                         LEFT OUTER JOIN scans_ssllabs as t2 ON (
                           scans_ssllabs.url = t2.url
                           AND scans_ssllabs.ipadres = t2.ipadres
                           AND scans_ssllabs.poort = t2.poort
-                          AND t2.scanmoment > scans_ssllabs.scanmoment  
-                          AND t2.scanmoment <= NOW()) 
-                        WHERE t2.url IS NULL 
-                          AND organization <> '' 
-                          AND scans_ssllabs.scanmoment <= now() 
+                          AND t2.scanmoment > scans_ssllabs.scanmoment
+                          AND t2.scanmoment <= NOW())
+                        WHERE t2.url IS NULL
+                          AND organization <> ''
+                          AND scans_ssllabs.scanmoment <= now()
                           AND url.isDead = 0
                           AND scans_ssllabs.isDead = 0
                           AND scans_ssllabs.rating IN ('T','F')
-                        group by (scans_ssllabs.url) 
+                        group by (scans_ssllabs.url)
                         order by organization ASC, rating DESC";
                 $results = DB::query($sql);
                 foreach ($results as $row) {
@@ -614,5 +614,5 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
 </body>
 </html>
 <!--
-This page was generated with MSPAINT.EXE on <?php echo date(DATE_RFC2822); ?>
+This page was generated with MSPAINT.EXE on <?php echo date(DATE_RFC2822); ?> in <?php round((microtime(TRUE)-$_SERVER['REQUEST_TIME_FLOAT']), 4); ?> ms
 -->
