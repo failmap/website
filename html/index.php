@@ -10,7 +10,7 @@ include_once('statistics.php');
 
 // error handling, make sure a mysql error makes the script exit non-zero
 function myErrorHandler($errno, $errstr, $errfile, $errline) {
-    echo("Died! Error($errno): {$errstr} on {$errfile}:{$errline}");
+    fwrite(STDERR, "Died! Error($errno): {$errstr} on {$errfile}:{$errline}\n");
     exit(1);
 }
 
