@@ -8,6 +8,14 @@ include_once("meekrodb.2.3.class.php");
 require_once('../configuration.php');
 include_once('statistics.php');
 
+// error handling, make sure a mysql error makes the script exit non-zero
+function myErrorHandler($errno, $errstr, $errfile, $errline) {
+    echo("Died! Error($errno): {$errstr} on {$errfile}:{$errline}");
+    exit(1);
+}
+
+set_error_handler('myErrorHandler');
+
 // some helper-functions that should be put in classes...
 // no exception on rounding, so if total is unknown or 0, just return 0.
 function percentage($number, $total){
