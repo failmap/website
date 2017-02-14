@@ -1,6 +1,6 @@
 <?php
 
-    $environment = "Production";
+    $environment = "Development";
     
     if ($environment == "Development"){
         DB::$user = "root";

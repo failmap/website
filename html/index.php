@@ -1,10 +1,5 @@
 <?php
-
-// todo on production: change Sudwest Fryslan:
-// UPDATE `coordinate` SET `organization` = 'Sudwest Fryslan' WHERE `coordinate`.`id` = 27;
-// UPDATE `organization` SET `name` = 'Nuenen, Gerwen en Nederwetten' WHERE `organization`.`name` = 'Nuenen';
-
-include_once("meekrodb.2.3.class.php");
+require_once("../vendor/autoload.php");
 require_once('../configuration.php');
 include_once('statistics.php');
 

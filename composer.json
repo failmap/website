@@ -1,0 +1,9 @@
+{
+    "name": "failmap/website",
+    "description": "The front end for the failmap",
+    "type": "project",
+    "minimum-stability": "stable",
+    "require": {
+        "sergeytsalkov/meekrodb": "^2.3"
+    }
+}
