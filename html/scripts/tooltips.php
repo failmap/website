@@ -3,6 +3,7 @@ require_once("../../vendor/autoload.php");
 require_once('../../configuration.php');
 require_once('../../code/functions.php');
 ?>
+// Generated on <?php echo date(DATE_RFC2822); ?> in <?php echo round((microtime(TRUE)-$_SERVER['REQUEST_TIME_FLOAT']), 4); ?>s
 $(document).ready(function() {
 $('.tooltip').tooltipster({
 theme: 'tooltipster-light'
