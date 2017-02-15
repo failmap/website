@@ -1,191 +1,79 @@
 <?php
 require_once("../vendor/autoload.php");
 require_once('../configuration.php');
-include_once('statistics.php');
-
-// error handling, make sure a mysql error makes the script exit non-zero
-function myErrorHandler($errno, $errstr, $errfile, $errline) {
-    fwrite(STDERR, "Died! Error($errno): {$errstr} on {$errfile}:{$errline}\n");
-    exit(1);
-}
-
+require_once('../configuration.php');
+include_once('../code/statistics.php');
+include_once('../code/functions.php'); // not the best pattern, got 2 php :)
 set_error_handler('myErrorHandler');
+?><!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
-// some helper-functions that should be put in classes...
-// no exception on rounding, so if total is unknown or 0, just return 0.
-function percentage($number, $total){
-    if (!$total) return 0;
-    return round(($number / $total) * 100, 0);
-}
+        <title>Faalkaart, geeft inzicht in beveiligde verbindingen van gemeentes.</title>
 
-$ratingColors = array("0" => "000000", "F" => "ff0000", "T" => "ff0000", "D" => "ff0000",  "C" => "FFA500",  "B" => "FFA500", "A-" => "00ff00", "A" => "00ff00","A+" => "00ff00","A++" => "00ff00");
-function getRatingColor($rating){
-    global $ratingColors; // saves re-initializing the same list. But this should be a class thing.
-    if (isset($ratingColors[$rating])){
-        return $ratingColors[$rating];
-    } else {
-        return "AAAAAA";
-    }
-}
+        <link rel="stylesheet" type="text/css" href="css/tooltipster.css" />
+        <link rel="stylesheet" type="text/css" href="css/themes/tooltipster-light.css" />
+        <link rel="stylesheet" type="text/css" href="css/leaflet.css" />
+        <link rel="stylesheet" type="text/css" href="css/bootstrap_v3.3.6.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7">
+        <link rel="stylesheet" type="text/css" href="css/bootstrap-theme_v3.3.6.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r">
 
-function makeHTMLId($text){
-    return preg_replace("/[^a-zA-Z]+/", "", $text);
-}
+        <script type="text/javascript" src="scripts/jquery_v2.2.0.min.js"></script>
+        <script type="text/javascript" src="scripts/bootstrap_v3.3.6.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS"></script>
+        <script type="text/javascript" src="scripts/jquery.tooltipster.min.js"></script>
+        <script type="text/javascript" src="scripts/leaflet.js"></script>
 
-?><html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>Faalkaart, geeft inzicht in beveiligde verbindingen van gemeentes.</title>
-    <link rel="stylesheet" type="text/css" href="css/tooltipster.css" />
-    <link rel="stylesheet" type="text/css" href="css/themes/tooltipster-light.css" />
-    <link rel="stylesheet" href="css/bootstrap_v3.3.6.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7">
-    <link rel="stylesheet" href="css/bootstrap-theme_v3.3.6.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r">
+        <!-- custom libraries / files -->
+        <script type="text/javascript" src="scripts/mapdata.php?t=<?php echo date("Ymdh"); ?>"></script> <!-- You can rip this, but also check our github repo :) -->
+        <script type="text/javascript" src="scripts/tooltips.php?t=<?php echo date("Ymdh"); ?>"></script>
 
-    <script type="text/javascript" src="scripts/jquery_v2.2.0.min.js"></script>
-    <script type="text/javascript" src="scripts/bootstrap_v3.3.6.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS"></script>
-    <script type="text/javascript" src="scripts/jquery.maphilight.min.js"></script>
-    <script type="text/javascript" src="scripts/jquery.tooltipster.min.js"></script>
+        <!-- leaflet user styling -->
+        <style>
+            #map { width: 1100px; height: 900px; }
+            .info {
+                min-width: 280px;
+                padding: 6px 8px; font: 14px/16px Arial, Helvetica, sans-serif;
+                background: white; background: rgba(255,255,255,0.8);
+                box-shadow: 0 0 15px rgba(0,0,0,0.2);
+                border-radius: 1px; }
+            .info h4 { margin: 0 0 5px; color: #777; }
+            .legend { text-align: left; line-height: 18px; color: #555; }
+            .legend i { width: 18px; height: 18px; float: left; margin-right: 8px; opacity: 0.7; }
+        </style>
+        <!-- /leaflet user styling -->
 
-    <?php
-        if (isset($refreshTimer) and ($refreshTimer > 0)){
-            print "<meta http-equiv=\"refresh\" content=\"".$refreshTimer."\">";
-        }
-    ?>
+        <?php
+            if (isset($refreshTimer) and ($refreshTimer > 0)){
+                print "<meta http-equiv=\"refresh\" content=\"".$refreshTimer."\">";
+            }
+        ?>
+    </head>
 
-    <script type="text/javascript">$(function() {
+    <body role="document">
 
-        $.fn.maphilight.defaults = {
-            fill: true,
-            fillColor: '000000',
-            fillOpacity: 0.4,
-            stroke: true,
-            strokeColor: 'ffffff',
-            strokeOpacity: 1,
-            strokeWidth: 1,
-            fade: true,
-            alwaysOn: true,
-            neverOn: false,
-            groupBy: false,
-            wrapClass: true,
-            shadow: false,
-            shadowX: 0,
-            shadowY: 0,
-            shadowRadius: 6,
-            shadowColor: '000000',
-            shadowOpacity: 0.8,
-            shadowPosition: 'outside',
-            shadowFrom: false
-        }
-        $('.map').maphilight();
-    });
-        $(document).ready(function() {
-            $('.tooltip').tooltipster({
-                theme: 'tooltipster-light'
-            });
-            <?php
-
-            /* Should look like:
-            $('#my-tooltip').tooltipster({
-                content: $('<span><img src="my-image.png" /> <strong>This text is in bold case !</strong></span>')
-            });
-            */
-
-            $previousUrl = ""; $i=0;
-
-            // ssllabs can discover multiple endpoints per domain. There can be multiple IP-address on both IPv4 and IPv6.
-            $sql = "SELECT
-                          organization,
-                          url.url as theurl,
-                          scans_ssllabs.ipadres,
-                          scans_ssllabs.servernaam,
-                          scans_ssllabs.poort,
-                          scans_ssllabs.scandate,
-                          scans_ssllabs.scantime,
-                          scans_ssllabs.rating
-                        FROM `url` left outer join scans_ssllabs ON url.url = scans_ssllabs.url
-                        LEFT OUTER JOIN scans_ssllabs as t2 ON (
-                          scans_ssllabs.url = t2.url
-                          AND scans_ssllabs.ipadres = t2.ipadres
-                          AND scans_ssllabs.poort = t2.poort
-                          AND t2.scanmoment > scans_ssllabs.scanmoment
-                          AND t2.scanmoment <= NOW())
-                        WHERE t2.url IS NULL
-                          AND organization <> ''
-                          AND scans_ssllabs.scanmoment <= now()
-                          AND url.isDead = 0
-                          AND scans_ssllabs.isDead = 0
-                        order by organization ASC";
-
-                $results = DB::query($sql);
-                foreach ($results as $row) {
-
-                    if ($previousUrl != $row['theurl']) {
-                        if ($i!=0){print "</span>')}); \n ";}
-
-                       print "$('#".makeHTMLId($row['theurl'])."').tooltipster({ animation: 'fade', interactive: 'true', theme: 'tooltipster-light', content: $('<span>";
-                    }
-
-                    if ($row['ipadres']) {
-                        if ($row['rating'] === '0')
-                            $unknown = "Geen beveiligde verbinding gevonden.<br /><br />Dit komt vaak doordat:<br /><ul><li>er gekozen is publieke informatie zo benaderbaar mogelijk te maken,</li><li>er gebruik wordt gemaakt van filtering,</li><li>er geen dienst (meer) draait,</li><li>een ander poortnummer wordt gebruikt dan 443.</li></ul><br />";
-                        else
-                            $unknown = "";
-
-                        $colorOordeel = getRatingColor($row['rating']);
-                        print $unknown."<span style=\"color: #".$colorOordeel."\">Domein: ".$row['theurl']."<br />Adres: ".$row['ipadres'].":".$row['poort']."<br /></span>Reverse name: ".$row['servernaam']."<br />Scantijd: ".$row['scandate']." ".$row['scantime']." <br /><br /><a href=\"https://www.ssllabs.com/ssltest/analyze.html?d=".$row['theurl']."&hideResults=on&latest\" target=\"_blank\">Second opinion</a><br /><br />";
-                    } else {
-                        print "Geen informatie gevonden. Dit domein wordt mogelijk niet gebruikt of moet nog worden niet getest.";
-                    }
-
-                    $previousUrl = $row['theurl'];
-                    $i++;
-                }
-                print "</span>')}); \n ";
-            ?>
-        });
-
-    </script>
-
-<!-- Piwik -->
-<script type="text/javascript">
-  var _paq = _paq || [];
-  _paq.push(['trackPageView']);
-  _paq.push(['enableLinkTracking']);
-  (function() {
-    var u="//faalkaart.nl/kiwip/";
-    _paq.push(['setTrackerUrl', u+'piwik.php']);
-    _paq.push(['setSiteId', 1]);
-    var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];
-    g.type='text/javascript'; g.async=true; g.defer=true; g.src=u+'piwik.js'; s.parentNode.insertBefore(g,s);
-  })();
-</script>
-<noscript><p><img src="//faalkaart.nl/kiwip/piwik.php?idsite=1" style="border:0;" alt="" /></p></noscript>
-<!-- End Piwik Code -->
-</head>
-
-<body role="document">
-
-<nav class="navbar navbar-default">
-    <div class="container">
-        <div class="navbar-header">
-            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target=".navbar-collapse">
-                <span class="sr-only">Toggle navigation</span>
-                <span class="icon-bar"></span>
-                <span class="icon-bar"></span>
-                <span class="icon-bar"></span>
-            </button>
-            <a class="navbar-brand" href="#">Faalkaart</a>
-        </div>
-        <div class="navbar-collapse collapse">
-            <ul class="nav navbar-nav">
-                <li class="active"><a href="#">Home</a></li>
-                <li><a href="#kaart">Kaart</a></li>
-                <li><a href="#balk">Balk</a></li>
-                <li><a href="#cijfers">Cijfers</a></li>
-                <li><a href="#domeinen">Domeinen</a></li>
-                <li><a href="#uitleg">Uitleg</a></li>
-            </ul>
-        </div><!--/.nav-collapse -->
-    </div>
-</nav>
+        <nav class="navbar navbar-default">
+            <div class="container">
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target=".navbar-collapse">
+                        <span class="sr-only">Toggle navigation</span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                    <a class="navbar-brand" href="#">Faalkaart</a>
+                </div>
+                <div class="navbar-collapse collapse">
+                    <ul class="nav navbar-nav">
+                        <li class="active"><a href="#">Home</a></li>
+                        <li><a href="#kaart">Kaart</a></li>
+                        <li><a href="#balk">Balk</a></li>
+                        <li><a href="#cijfers">Cijfers</a></li>
+                        <li><a href="#domeinen">Domeinen</a></li>
+                        <li><a href="#uitleg">Uitleg</a></li>
+                    </ul>
+                </div><!--/.nav-collapse -->
+            </div>
+        </nav>
 
     <div class="container theme-showcase" role="main">
 
@@ -194,14 +82,8 @@ function makeHTMLId($text){
          <p>Faalkaart geeft inzicht in hoe veilig uw gemeente is richting het internet. Er wordt gekeken hoe veilig de gemeente haar verbindingen heeft ingericht. Het is belangrijk dat dit goed
 gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
             <p>Stuur nieuwe subdomeinen in via twitter: <a href="https://twitter.com/faalkaart">@faalkaart</a> of mail <a href="mailto:info@faalkaart.nl?subject=subdomeinen">info@faalkaart.nl</a></p>
-         <p><small>Update 7 augustus 2016: Faalkaart heeft de steun gekregen van het SIDN fonds, we zullen het komende jaar de kaart uitbreiden en op veel meer controleren. We gaan de kaartrot oplossen en zorgen dat het makkelijk wordt om zelf de kaart te kunnen draaien (onafhankelijk). Ook is de chaching van de site ingevoerd, dus het voelt weer snel(ler) aan.</small></p>
-         <!-- <p><small>Update 9 juni 2016: Door een nieuwe kwetsbaarheid zijn er 100+ domeinen in het rood beland, van 2% naar 9% kwetsbaar dus. Het aantal matige domeinen blijft gelukkig afnemen. Hoe lang zal het duren tot alles gepatched is? Wie patcht het laatst?</small></p> -->
-         <!-- <p><small>Extra update: Faalkaart heeft een projectbijdrage gevraagd aan het SIDN fonds om er voor te zorgen dat dit middel breder en makkelijker kan worden ingezet. We gaan hierdoor vele honderdduizenden kwetsbaarheden aan de kaak te stellen en blijven motiveren om ze te verhelpen. De techneuten, hackers en nerds achter faalkaart staan te trappelen om het internet robuuster te maken. Half Juni weten we meer. Spannend!</small></p> -->
-         <!-- <p><small>Extra update 2: We zien dat door de grote hoeveelheid data we caching moeten gaan toepassen en verder moeten optimaliseren. De bedoeling is om de kaart zo actueel mogelijk weer te geven. Tot dit opgelost is zal het iets langer duren voordat de kaart geladen is.</small></p>-->
-         <!-- <p><small>Update 8 april 2016: Het aantal domeinen met een onvoldoende is gezakt naar 2%, was ooit 8%. Er zijn zojuist 1200 domeinen toegevoegd. Er is een team aan het ontstaan dat de faalkaart verder gaat uitbreiden en onderhouden. Vele handen maken licht werk. Dank aan gemeenten voor het insturen van subdomeinen. Dit is altijd welkom!</small></p> -->
-         <!-- <p><small>Update 25 maart 2016: De kaart wordt automatisch ververst. Onder de uitleg staat een overzicht met domeinen die onvoldoende scoren.</small></p>-->
-         <!-- <p><small>Update 18 maart 2016: De kaart wordt zeer binnenkort automatisch bijgewerkt. Nieuw zijn statistieken met historie. De domeinenlijst is verbeterd en er is tekst toegevoegd over de totstandkoming van het cijfer. Binnenkort ook open source.</small></p>
-         <!-- <p><small>Update 16 maart 2016: De eerste serie van 1800 domeinen is geladen, dit wordt nog aangevuld en zal binnenkort opnieuw worden gecontroleerd. De testdatum is nu zichtbaar. De eerste verbeteringen schijnen een half uur na presentatie al te zijn doorgevoerd. Dat is stoer!</small></p>-->
+
+            <p><small>Update 15 februari 2017: Inmiddels wordt er weer <a href="https://github.com/failmap" target="_blank">volop gewerkt</a> aan faalkaart. De kaart is bijgewerkt naar nieuwe, goed onderhoudbare, technieken. Inmiddels is er een <a href="https://internetcleanup.foundation" target="_blank">stichting opgericht</a> om de ontwikkeling van de kaart te stimuleren. Binnenkort wordt er gewerkt aan het beter scannen van e.e.a: er gaat meer en sneller gescand worden.</small></p>
         </div>
 
         <div class="page-header">
@@ -209,44 +91,9 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
             <h1>De Kaart</h1>
             <p>Deze kaart is te lezen als een stoplicht. Iedere gemeente is weergegeven als een kleur. Rood betekent onvoldoende, groen betekent voldoende. Nuances daargelaten, zie onderaan.</p>
         </div>
-        <center>
-            <img class="map" name="NLGem" alt="NLGem" align="absmiddle" hspace="0" vspace="0" src="./images/kaart2.png" width="770" usemap="#NLGem" border="0">
-        <map name="NLGem" id="NLGem">
-        <?php
-            // todo: this has no time-constraint yet.
-            // none-time constrained: results overwrite eachother $sql = "select coordinate.organization, area, max(rating) as rating, max(ratingNoTrust) as oordeelInternVertrouwen from coordinate left outer join organization ON coordinate.organization = organization.name left outer JOIN url ON url.organization = organization.name left outer JOIN scans_ssllabs ON scans_ssllabs.url = url.url GROUP BY area";
-            // some municipalities have more than one area... you have to draw all of them and still have the right color :) FUN!
-            // grouping by area is a bit of a disgusting hack, because no area is unique...
-            $sql = "SELECT
-                          url.organization as organization,
-                          area,
-                          max(scans_ssllabs.rating) as rating
-                        FROM `url`
-                        left outer join scans_ssllabs ON url.url = scans_ssllabs.url
-                        left outer join organization ON url.organization = organization.name
-                        inner join coordinate ON coordinate.organization = organization.name
-                        LEFT OUTER JOIN scans_ssllabs as t2 ON (
-                          scans_ssllabs.url = t2.url
-                          AND scans_ssllabs.ipadres = t2.ipadres
-                          AND scans_ssllabs.poort = t2.poort
-                          AND t2.scanmoment > scans_ssllabs.scanmoment
-                          AND t2.scanmoment <= DATE_ADD(now(), INTERVAL -0 DAY))
-                        WHERE t2.url IS NULL
-                          AND url.organization <> ''
-                          AND scans_ssllabs.scanmoment <= DATE_ADD(now(), INTERVAL -0 DAY)
-                          AND url.isDead = 0
-                          AND scans_ssllabs.isDead = 0
-                        group by (area)
-                        order by url.organization ASC, rating DESC";
-            //$sql = "select coordinate.organization, area, max(rating) as rating, max(ratingNoTrust) as oordeelInternVertrouwen from coordinate left outer join organization ON coordinate.organization = organization.name left outer JOIN url ON url.organization = organization.name left outer JOIN scans_ssllabs ON scans_ssllabs.url = url.url GROUP BY area";
-            $results = DB::query($sql);
-            foreach ($results as $row) {
-                $colorOordeel = getRatingColor($row['rating']);
-                print "<area data-maphilight='{\"fillColor\":\"".$colorOordeel."\"}' shape=\"Poly\" title=\"".$row['organization']."\" href=\"#".$row['organization']."\" coords=\"".$row['area']."\"  >\n";
-            }
-        ?>
-        </map>
-        </center>
+
+        <div id='map'></div>
+        <script type="text/javascript" src="scripts/failmapstyling.js?t=<?php echo date("Ymdh"); ?>"></script>
 
         <div class="page-header">
             <a name="balk"></a>
@@ -277,30 +124,13 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
             <div class="progress-bar progress-bar-success" style="width: <?php print $progressGreen;?>%"><span class="sr-only">35% Complete (success)</span></div>
             <div class="progress-bar progress-bar-warning" style="width: <?php print $progressOrange;?>%"><span class="sr-only">20% Complete (warning)</span></div>
             <div class="progress-bar progress-bar-danger" style="width: <?php print $progressRed;?>%"><span class='sr-only'>10% Complete (danger)</span></div>
-
-            <a class="dropdown-toggle" data-toggle="dropdown" href="#">
-                Dropdown
-            </a>
         </div>
 
 
-<?php
-
-        $previousDay = $Stats->goBack(1,'municipality');
-        $previousTwoDays = $Stats->goBack(2,'municipality');
-        $previousWeek = $Stats->goBack(7,'municipality');
-        $previousTwoWeeks = $Stats->goBack(14,'municipality');
-        $previousMonth = $Stats->goBack(31,'municipality');
-        $previousQuarter = $Stats->goBack(91,'municipality');
-        $previousHalfYear = $Stats->goBack(182,'municipality');
-
-
-
-?>
         <div class="page-header">
-        <a name="cijfers"></a>
-        <h1>De Cijfers</h1>
-        <p><i>Let op: verwijderde/opgeruimde subdomeinen en endpoints staan niet in deze statistieken. Dit zijn er ongeveer 10, wat toeneemt over tijd.</i></p>
+            <a name="cijfers"></a>
+            <h1>De Cijfers</h1>
+            <p><i>Let op: verwijderde/opgeruimde subdomeinen en endpoints staan niet in deze statistieken. Dit zijn er ongeveer 10, wat toeneemt over tijd.</i></p>
         </div>
         <div class="row">
             <div class="col-md-12">
@@ -315,157 +145,39 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                     </tr>
                     </thead>
                     <tbody>
-                    <tr>
-                        <td>Laatste stand</td>
-                        <td><?php print $total;?></td>
-                        <td><?php print $green;?> <small>(<?php print percentage($green,$total);?>%)<small></td>
-                        <td><?php print $orange;?> <small>(<?php print percentage($orange,$total);?>%)<small></td>
-                        <td><?php print $red;?> <small>(<?php print percentage($red,$total);?>%)<small></td>
-                    </tr>
-                    <tr>
-                        <td>Gisteren</td>
-                        <td><?php print $previousDay['total'];?></td>
-                        <td><?php print $previousDay['green'];?> <small>(<?php print percentage($previousDay['green'],$previousDay['total']);?>%)<small></td>
-                        <td><?php print $previousDay['orange'];?> <small>(<?php print percentage($previousDay['orange'],$previousDay['total']);?>%)<small></td>
-                        <td><?php print $previousDay['red'];?> <small>(<?php print percentage($previousDay['red'],$previousDay['total']);?>%)<small></td>
-                    </tr>
-                    <tr>
-                        <td>Eergisteren</td>
-                        <td><?php print $previousTwoDays['total'];?></td>
-                        <td><?php print $previousTwoDays['green'];?> <small>(<?php print percentage($previousTwoDays['green'],$previousTwoDays['total']);?>%)<small></td>
-                        <td><?php print $previousTwoDays['orange'];?> <small>(<?php print percentage($previousTwoDays['orange'],$previousTwoDays['total']);?>%)<small></td>
-                        <td><?php print $previousTwoDays['red'];?> <small>(<?php print percentage($previousTwoDays['red'],$previousTwoDays['total']);?>%)<small></td>
-                    </tr>
-                    <tr>
-                        <td>Week</td>
-                        <td><?php print $previousWeek['total'];?></td>
-                        <td><?php print $previousWeek['green'];?> <small>(<?php print percentage($previousWeek['green'],$previousWeek['total']);?>%)<small></td>
-                        <td><?php print $previousWeek['orange'];?> <small>(<?php print percentage($previousWeek['orange'],$previousWeek['total']);?>%)<small></td>
-                        <td><?php print $previousWeek['red'];?> <small>(<?php print percentage($previousWeek['red'],$previousWeek['total']);?>%)<small></td>
-                    </tr>
-                    <tr>
-                        <td>Maand</td>
-                        <td><?php print $previousMonth['total'];?></td>
-                        <td><?php print $previousMonth['green'];?> <small>(<?php print percentage($previousMonth['green'],$previousMonth['total']);?>%)<small></td>
-                        <td><?php print $previousMonth['orange'];?> <small>(<?php print percentage($previousMonth['orange'],$previousMonth['total']);?>%)<small></td>
-                        <td><?php print $previousMonth['red'];?> <small>(<?php print percentage($previousMonth['red'],$previousMonth['total']);?>%)<small></td>
-                    </tr>
-                    <tr>
-                        <td>Kwartaal</td>
-                        <td><?php print $previousQuarter['total'];?></td>
-                        <td><?php print $previousQuarter['green'];?> <small>(<?php print percentage($previousQuarter['green'],$previousQuarter['total']);?>%)<small></td>
-                        <td><?php print $previousQuarter['orange'];?> <small>(<?php print percentage($previousQuarter['orange'],$previousQuarter['total']);?>%)<small></td>
-                        <td><?php print $previousQuarter['red'];?> <small>(<?php print percentage($previousQuarter['red'],$previousQuarter['total']);?>%)<small></td>
-                    </tr>
-                    <tr>
-                        <td>Half Jaar</td>
-                        <td><?php print $previousHalfYear['total'];?></td>
-                        <td><?php print $previousHalfYear['green'];?> <small>(<?php print percentage($previousHalfYear['green'],$previousHalfYear['total']);?>%)<small></td>
-                        <td><?php print $previousHalfYear['orange'];?> <small>(<?php print percentage($previousHalfYear['orange'],$previousHalfYear['total']);?>%)<small></td>
-                        <td><?php print $previousHalfYear['red'];?> <small>(<?php print percentage($previousHalfYear['red'],$previousHalfYear['total']);?>%)<small></td>
-                    </tr>
+                    <?php
+                    function showPreviousNumbers($days, $label, $category) {
+                        ob_start();
+                        $Stats = new Statistics();
+                        $previousDay = $Stats->goBack($days,$category);
+                        ?>
+                        <tr>
+                            <td><?php print $label;?></td>
+                            <td><?php print $previousDay['total'];?></td>
+                            <td><?php print $previousDay['green'];?> <small>(<?php print percentage($previousDay['green'],$previousDay['total']);?>%)<small></td>
+                            <td><?php print $previousDay['orange'];?> <small>(<?php print percentage($previousDay['orange'],$previousDay['total']);?>%)<small></td>
+                            <td><?php print $previousDay['red'];?> <small>(<?php print percentage($previousDay['red'],$previousDay['total']);?>%)<small></td>
+                        </tr>
+                        <?php
+                        return ob_get_clean();
+                    }
+
+                    print showPreviousNumbers(0,"Laatste Stand","municipality");
+                    print showPreviousNumbers(1,"Gisteren","municipality");
+                    print showPreviousNumbers(7,"Afgelopen week","municipality");
+                    print showPreviousNumbers(31,"Afgelopen Maand","municipality");
+                    print showPreviousNumbers(62,"Twee Maanden","municipality");
+                    print showPreviousNumbers(93,"Drie Maanden","municipality");
+                    print showPreviousNumbers(124,"Vier Maanden","municipality");
+                    print showPreviousNumbers(155,"Vijf Maanden","municipality");
+                    print showPreviousNumbers(186,"Half Jaar","municipality");
+
+                    ?>
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <div class="col-md-6">
-            <div class="page-header">
-                <a name="domeinen"></a>
-                <h1>Domeinen</h1>
-            </div>
-            <table class="table table-striped">
-                <thead>
-                <tr><th>Gemeente</th><th>Domeinen / oordeel</th></tr>
-                </thead><tbody>
-            <?php
-
-            $gradeColors = array("0" => "000000", "F" => "ff0000", "T" => "ff0000", "D" => "ff0000",  "C" => "FFA500",  "B" => "FFA500", "A-" => "00ff00", "A" => "00ff00","A+" => "00ff00","A++" => "00ff00");
-
-                $previousGemeente = ""; $previousUrl = "";
-                $i=0; // should use a template engine :)
-
-                /**
-
-                 We want a query that:
-                 - Gives results to a certain date.
-                 - Gives only the latest result from the entire set.
-
-                 Vendor neutral and fast solution:
-                 http://stackoverflow.com/questions/121387/fetch-the-row-which-has-the-max-value-for-a-column
-
-                 SELECT organization, url.url as theurl, scans_ssllabs.ipadres, scans_ssllabs.servernaam, scans_ssllabs.scandate, scans_ssllabs.scantime, scans_ssllabs.rating as oordeel FROM `url` left outer join scans_ssllabs ON url.url = scans_ssllabs.url LEFT OUTER JOIN scans_ssllabs as t2 ON (scans_ssllabs.url = t2.url AND t2.scandate > scans_ssllabs.scandate  AND t2.scandate < '2016-03-19') WHERE t2.url IS NULL AND organization <> '' AND scans_ssllabs.scandate < '2016-03-19' order by organization ASC
-
-                 // with this one we browse through time and get only one result per url :) Time is by default NOW()
-
-                 */
-
-                // This selects the LAST SCANNED domain, but these can be multiple since a domain can have N endpoints.
-                // this means that coloring is off, since the N-1 endpoint might have F and endpoint N may have A.
-                // that means the domain will be falsely colored as A.
-
-                // the solution was to add uniciteit (uniqueness) to the set of url, ip and port, and group-concating or maxing those
-                // for the worst color the domain has.
-
-                $sql = "SELECT
-                          organization,
-                          url.url as theurl,
-                          scans_ssllabs.ipadres,
-                          scans_ssllabs.servernaam,
-                          scans_ssllabs.scandate,
-                          scans_ssllabs.scantime,
-                          count(scans_ssllabs.rating) as endpointsfound,
-                          max(scans_ssllabs.rating) as rating
-                        FROM `url` left outer join scans_ssllabs ON url.url = scans_ssllabs.url
-                        LEFT OUTER JOIN scans_ssllabs as t2 ON (
-                          scans_ssllabs.url = t2.url
-                          AND scans_ssllabs.ipadres = t2.ipadres
-                          AND scans_ssllabs.poort = t2.poort
-                          AND t2.scanmoment > scans_ssllabs.scanmoment
-                          AND t2.scanmoment <= now())
-                        WHERE t2.url IS NULL
-                          AND organization <> ''
-                          AND scans_ssllabs.scanmoment <= now()
-                          AND url.isDead = 0
-                          AND scans_ssllabs.isDead = 0
-                        group by organization, scans_ssllabs.url 
-                        order by organization ASC, rating DESC";
-                $results = DB::query($sql);
-                    foreach ($results as $row) {
-
-                        if ($previousGemeente != $row['organization']){
-                            // vorige afsluiten
-                            if ($i!= 0) {
-                                print "</td></tr>";
-                            }
-
-                            print "<tr><td><a name=\"".$row['organization']."\"></a>".$row['organization']."</td><td>";
-                        }
-
-                        // todo: count number of urls and endpoints.
-                        if ($previousUrl != $row['theurl']){
-                            if (isset($gradeColors[$row['rating']])){
-                                $colorOordeel = $gradeColors[$row['rating']];
-                            } else {
-                                $colorOordeel = "AAAAAA";
-                            }
-
-                            // show a nice (2x) if there are multiple endpoints. Amsterdam has redundant endpoints on both ipv4 and ipv6
-                            if ($row['endpointsfound'] > 1) {
-                                print "<div style='color: #" . $colorOordeel . "' id='" . makeHTMLId($row['theurl']) . "'>" . $row['theurl'] . " (" . $row['endpointsfound'] . "x)</div> ";
-                            } else {
-                                print "<div style='color: #" . $colorOordeel . "' id='" . makeHTMLId($row['theurl']) . "'>" . $row['theurl'] . "</div> ";
-                            }
-                        }
-                        $previousGemeente = $row['organization'];
-                        $previousUrl = $row['theurl'];
-                    }
-
-                print "</td></tr>";
-                ?>
-                </tbody>
-            </table>
-        </div>
 
         <div class="col-md-6">
             <div class="page-header">
@@ -507,6 +219,18 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                 <li>Talen: Python, PHP op MariaDB.</li>
                 <li>JQuery MapHighlight door David Lynch</li>
             </ul>
+
+            <h2>Wat is de historie van Faalkaart?</h2>
+            <p>
+            <p><small><b>7 augustus 2016</b>: Faalkaart heeft de steun gekregen van het SIDN fonds, we zullen het komende jaar de kaart uitbreiden en op veel meer controleren. We gaan de kaartrot oplossen en zorgen dat het makkelijk wordt om zelf de kaart te kunnen draaien (onafhankelijk). Ook is de chaching van de site ingevoerd, dus het voelt weer snel(ler) aan.</small></p>
+            <p><small><b>9 juni 2016</b>: Door een nieuwe kwetsbaarheid zijn er 100+ domeinen in het rood beland, van 2% naar 9% kwetsbaar dus. Het aantal matige domeinen blijft gelukkig afnemen. Hoe lang zal het duren tot alles gepatched is? Wie patcht het laatst?</small></p>
+            <p><small><b>Extra update</b>: Faalkaart heeft een projectbijdrage gevraagd aan het SIDN fonds om er voor te zorgen dat dit middel breder en makkelijker kan worden ingezet. We gaan hierdoor vele honderdduizenden kwetsbaarheden aan de kaak te stellen en blijven motiveren om ze te verhelpen. De techneuten, hackers en nerds achter faalkaart staan te trappelen om het internet robuuster te maken. Half Juni weten we meer. Spannend!</small></p>
+            <p><small><b>Extra update 2</b>: We zien dat door de grote hoeveelheid data we caching moeten gaan toepassen en verder moeten optimaliseren. De bedoeling is om de kaart zo actueel mogelijk weer te geven. Tot dit opgelost is zal het iets langer duren voordat de kaart geladen is.</small></p>
+            <p><small><b>8 april 2016</b>: Het aantal domeinen met een onvoldoende is gezakt naar 2%, was ooit 8%. Er zijn zojuist 1200 domeinen toegevoegd. Er is een team aan het ontstaan dat de faalkaart verder gaat uitbreiden en onderhouden. Vele handen maken licht werk. Dank aan gemeenten voor het insturen van subdomeinen. Dit is altijd welkom!</small></p>
+            <p><small><b>25 maart 2016</b>: De kaart wordt automatisch ververst. Onder de uitleg staat een overzicht met domeinen die onvoldoende scoren.</small></p>
+            <p><small><b>18 maart 2016</b>: De kaart wordt zeer binnenkort automatisch bijgewerkt. Nieuw zijn statistieken met historie. De domeinenlijst is verbeterd en er is tekst toegevoegd over de totstandkoming van het cijfer. Binnenkort ook open source.</small>
+            <p><small><b>16 maart 2016</b>: De eerste serie van 1800 domeinen is geladen, dit wordt nog aangevuld en zal binnenkort opnieuw worden gecontroleerd. De testdatum is nu zichtbaar. De eerste verbeteringen schijnen een half uur na presentatie al te zijn doorgevoerd. Dat is stoer!</small></p>
+            </p>
 
             <div class="page-header">
                 <a name="takenlijst"></a>
@@ -602,6 +326,104 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
                 }
 
                 print "</td></tr>";
+                ?>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="col-md-6">
+            <div class="page-header">
+                <a name="domeinen"></a>
+                <h1>Domeinen</h1>
+            </div>
+            <table class="table table-striped">
+                <thead>
+                <tr><th>Gemeente</th><th>Domeinen / oordeel</th></tr>
+                </thead><tbody>
+            <?php
+
+            $gradeColors = array("0" => "000000", "F" => "ff0000", "T" => "ff0000", "D" => "ff0000",  "C" => "FFA500",  "B" => "FFA500", "A-" => "00ff00", "A" => "00ff00","A+" => "00ff00","A++" => "00ff00");
+
+                $previousGemeente = ""; $previousUrl = "";
+                $i=0; // should use a template engine :)
+
+                /**
+
+                 We want a query that:
+                 - Gives results to a certain date.
+                 - Gives only the latest result from the entire set.
+
+                 Vendor neutral and fast solution:
+                 http://stackoverflow.com/questions/121387/fetch-the-row-which-has-the-max-value-for-a-column
+
+                 // with this one we browse through time and get only one result per url :) Time is by default NOW()
+
+                 */
+
+                // This selects the LAST SCANNED domain, but these can be multiple since a domain can have N endpoints.
+                // this means that coloring is off, since the N-1 endpoint might have F and endpoint N may have A.
+                // that means the domain will be falsely colored as A.
+
+                // the solution was to add uniciteit (uniqueness) to the set of url, ip and port, and group-concating or maxing those
+                // for the worst color the domain has.
+
+                $sql = "SELECT
+                          organization,
+                          url.url as theurl,
+                          scans_ssllabs.ipadres,
+                          scans_ssllabs.servernaam,
+                          scans_ssllabs.scandate,
+                          scans_ssllabs.scantime,
+                          count(scans_ssllabs.rating) as endpointsfound,
+                          max(scans_ssllabs.rating) as rating
+                        FROM `url` left outer join scans_ssllabs ON url.url = scans_ssllabs.url
+                        LEFT OUTER JOIN scans_ssllabs as t2 ON (
+                          scans_ssllabs.url = t2.url
+                          AND scans_ssllabs.ipadres = t2.ipadres
+                          AND scans_ssllabs.poort = t2.poort
+                          AND t2.scanmoment > scans_ssllabs.scanmoment
+                          AND t2.scanmoment <= now())
+                        WHERE t2.url IS NULL
+                          AND organization <> ''
+                          AND scans_ssllabs.scanmoment <= now()
+                          AND url.isDead = 0
+                          AND scans_ssllabs.isDead = 0
+                        group by organization, scans_ssllabs.url 
+                        order by organization ASC, rating DESC";
+                $results = DB::query($sql);
+                    foreach ($results as $row) {
+
+                        if ($previousGemeente != $row['organization']){
+                            // vorige afsluiten
+                            if ($i!= 0) {
+                                print "<small><a href='#kaart'>terug naar de kaart...</a></small></td></tr>";
+                                $i=0;
+                            }
+
+                            print "<tr><td><a name=\"".$row['organization']."\"></a>".$row['organization']."</td><td>";
+                        }
+
+                        // todo: count number of urls and endpoints.
+                        if ($previousUrl != $row['theurl']){
+                            if (isset($gradeColors[$row['rating']])){
+                                $colorOordeel = $gradeColors[$row['rating']];
+                            } else {
+                                $colorOordeel = "AAAAAA";
+                            }
+
+                            // show a nice (2x) if there are multiple endpoints. Amsterdam has redundant endpoints on both ipv4 and ipv6
+                            if ($row['endpointsfound'] > 1) {
+                                print "<div style='color: #" . $colorOordeel . "' id='" . makeHTMLId($row['theurl']) . "'>" . $row['theurl'] . " (" . $row['endpointsfound'] . "x)</div> ";
+                            } else {
+                                print "<div style='color: #" . $colorOordeel . "' id='" . makeHTMLId($row['theurl']) . "'>" . $row['theurl'] . "</div> ";
+                            }
+                        }
+                        $previousGemeente = $row['organization'];
+                        $previousUrl = $row['theurl'];
+                        $i++;
+                    }
+
+                print "<small><a href='#kaart'>terug naar de kaart...</a></small></td></tr>";
                 ?>
                 </tbody>
             </table>
