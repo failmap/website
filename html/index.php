@@ -275,9 +275,15 @@ gebeurt omdat hierover ook uw gegevens worden verstuurd.</p>
 
             $total = $red + $green + $orange;
 
-            $progressRed = floor(($red/$total)*100);
-            $progressOrange = floor(($orange/$total)*100);
-            $progressGreen = floor(($green/$total)*100);
+            if ($total == 0){
+                $progressRed = 0;
+                $progressOrange = 0;
+                $progressGreen = 0;
+            } else {
+                $progressRed = floor(($red/$total)*100);
+                $progressOrange = floor(($orange/$total)*100);
+                $progressGreen = floor(($green/$total)*100);
+            }
 
             // due to rounding we might miss a little... so fill it up on the positive side...
             if ($progressRed+$progressOrange+$progressGreen<100) $progressGreen += 100 - ($progressRed+$progressOrange+$progressGreen);
